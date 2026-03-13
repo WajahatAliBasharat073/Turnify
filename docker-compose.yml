@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cleanconnect-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cleanconnect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cleanconnect-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cleanconnect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cleanconnect-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cleanconnect-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder # For local dev, we could mount volumes and use hot-reload, but building references the structure
+    container_name: cleanconnect-backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cleanconnect-network
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run start:dev
+
+  admin:
+    image: node:22-alpine
+    container_name: cleanconnect-admin
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./admin:/app
+      - /app/node_modules
+    networks:
+      - cleanconnect-network
+    # Assuming vite/react for admin panel local dev
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+networks:
+  cleanconnect-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
