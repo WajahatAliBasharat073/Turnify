@@ -90,4 +90,32 @@ export class BookingsController {
     // In a real app we would join photos on findOne or create a specific query
     return this.bookingsService.findOne(id, user).then((b) => b.photos || []);
   }
+
+  @Patch(':id/accept')
+  @Roles(UserRole.CLEANER)
+  @ApiOperation({ summary: 'Accept a job offer' })
+  acceptJob(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookingsService.acceptBooking(id, user);
+  }
+
+  @Patch(':id/decline')
+  @Roles(UserRole.CLEANER)
+  @ApiOperation({ summary: 'Decline a job offer' })
+  declineJob(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookingsService.declineBooking(id, user);
+  }
+
+  @Patch(':id/start')
+  @Roles(UserRole.CLEANER)
+  @ApiOperation({ summary: 'Start a job (mark as in_progress)' })
+  startJob(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookingsService.startBooking(id, user);
+  }
+
+  @Patch(':id/complete')
+  @Roles(UserRole.CLEANER)
+  @ApiOperation({ summary: 'Complete a job (requires after photos)' })
+  completeJob(@GetUser() user: User, @Param('id', ParseUUIDPipe) id: string) {
+    return this.bookingsService.completeBooking(id, user);
+  }
 }

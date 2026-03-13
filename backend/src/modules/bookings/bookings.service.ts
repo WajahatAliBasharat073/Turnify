@@ -12,6 +12,8 @@ import {
 } from '../../database/entities/booking.entity';
 import { Property } from '../../database/entities/property.entity';
 import { User, UserRole } from '../../database/entities/user.entity';
+import { BookingPhoto, PhotoType } from '../../database/entities/booking-photo.entity';
+import { BookingsGateway } from './bookings.gateway';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { PricingService } from './pricing.service';
 
@@ -22,7 +24,10 @@ export class BookingsService {
     private bookingsRepository: Repository<Booking>,
     @InjectRepository(Property)
     private propertiesRepository: Repository<Property>,
+    @InjectRepository(BookingPhoto)
+    private photosRepository: Repository<BookingPhoto>,
     private pricingService: PricingService,
+    private bookingsGateway: BookingsGateway,
   ) {}
 
   /**
@@ -166,5 +171,89 @@ export class BookingsService {
     booking.host_confirmed_at = new Date();
     // Here we would also trigger payouts
     return this.bookingsRepository.save(booking);
+  }
+
+  async acceptBooking(id: string, cleaner: User): Promise<Booking> {
+    const booking = await this.bookingsRepository.findOne({
+      where: { id },
+      relations: ['property'],
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== BookingStatus.SEARCHING) {
+      throw new BadRequestException('Booking is no longer available');
+    }
+
+    booking.cleaner_id = cleaner.id;
+    booking.status = BookingStatus.ASSIGNED;
+    const savedBooking = await this.bookingsRepository.save(booking);
+
+    this.bookingsGateway.emitToUser(
+      booking.host_id,
+      'booking:job_accepted',
+      { bookingId: booking.id, cleanerId: cleaner.id }
+    );
+
+    return savedBooking;
+  }
+
+  async declineBooking(id: string, cleaner: User) {
+    // This acknowledges the decline. The Bull Queue timer will proceed to the next round if all decline.
+    return { success: true, message: 'Job declined successfully' };
+  }
+
+  async startBooking(id: string, cleaner: User): Promise<Booking> {
+    const booking = await this.bookingsRepository.findOne({ where: { id } });
+    if (!booking || booking.cleaner_id !== cleaner.id) {
+      throw new NotFoundException('Booking not found or not assigned to you');
+    }
+
+    if (booking.status !== BookingStatus.ASSIGNED) {
+      throw new BadRequestException('Booking cannot be started from its current status');
+    }
+
+    booking.status = BookingStatus.IN_PROGRESS;
+    const savedBooking = await this.bookingsRepository.save(booking);
+
+    this.bookingsGateway.emitToUser(
+      booking.host_id,
+      'booking:job_started',
+      { bookingId: booking.id }
+    );
+
+    return savedBooking;
+  }
+
+  async completeBooking(id: string, cleaner: User): Promise<Booking> {
+    const booking = await this.bookingsRepository.findOne({ where: { id } });
+    if (!booking || booking.cleaner_id !== cleaner.id) {
+      throw new NotFoundException('Booking not found or not assigned to you');
+    }
+
+    if (booking.status !== BookingStatus.IN_PROGRESS) {
+      throw new BadRequestException('Booking must be IN_PROGRESS to complete');
+    }
+
+    // Require AFTER photos to complete
+    const afterPhotos = await this.photosRepository.find({
+      where: { booking_id: id, photo_type: PhotoType.AFTER },
+    });
+
+    const confirmedAfterPhotos = afterPhotos.filter(p => p.s3_url !== null);
+    if (confirmedAfterPhotos.length === 0) {
+      throw new BadRequestException('You must upload and confirm at least one AFTER photo to complete the job');
+    }
+
+    booking.status = BookingStatus.COMPLETED;
+    booking.completed_at = new Date();
+    const savedBooking = await this.bookingsRepository.save(booking);
+
+    this.bookingsGateway.emitToUser(
+      booking.host_id,
+      'booking:job_completed',
+      { bookingId: booking.id }
+    );
+
+    return savedBooking;
   }
 }
