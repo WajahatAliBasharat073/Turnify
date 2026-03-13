@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { CleanerProfile } from './cleaner-profile.entity';
 import { Property } from './property.entity';
 import { Booking } from './booking.entity';
+import { Notification } from './notification.entity';
 
 export enum UserRole {
   HOST = 'host',
@@ -58,4 +59,10 @@ export class User {
 
   @OneToMany(() => Booking, booking => booking.cleaner)
   cleaner_bookings: Booking[];
+
+  @Column({ name: 'onesignal_player_id', nullable: true })
+  onesignal_player_id: string;
+
+  @OneToMany(() => Notification, notification => notification.user)
+  notifications: Notification[];
 }

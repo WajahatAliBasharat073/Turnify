@@ -6,6 +6,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { MediaModule } from './modules/media/media.module';
+import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { MediaModule } from './modules/media/media.module';
     PropertiesModule,
     BookingsModule,
     MediaModule,
+    UsersModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [],
