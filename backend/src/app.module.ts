@@ -3,6 +3,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { MediaModule } from './modules/media/media.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
     AuthModule,
     PropertiesModule,
     BookingsModule,
+    MediaModule,
   ],
   controllers: [],
   providers: [],
